@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flower Tasks</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            color: #343a40;
+        }
+        h1 {
+            color: #28a745;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            table-layout: fixed;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        th {
+            background-color: #28a745;
+            color: white;
+            position: relative;
+        }
+        tr:nth-child(even) {
+            background-color: #f1f3f5;
+        }
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        .filter-input {
+            margin-top: 20px;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .pagination {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .pagination button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            border: none;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: background 0.3s;
+        }
+        .pagination button:hover {
+            background: linear-gradient(to right, #ff6b47, #feb47b);
+        }
+        .pagination button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .resize-handle {
+            display: inline-block;
+            background: #000;
+            width: 3px;
+            height: 100%;
+            position: absolute;
+            right: 0;
+            top: 0;
+            transform: translateX(50%);
+            z-index: 1;
+            touch-action: none;
+            cursor: col-resize;
+        }
+        .popup {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .popup-content {
+            background: linear-gradient(to right, #000000, #00000059);
+            margin: 10% auto;
+            padding: 20px;
+            border: 2px double #ff758c;
+            border-radius: 25px;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .close {
+            color: #ff758c;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: #ff7eb3;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .popup-content p {
+            margin: 10px 0;
+        }
+        .popup-content p strong {
+            color: #ff7eb3;
+        }
+        .popup-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .popup-navigation button {
+            padding: 10px 20px;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            border: none;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .popup-navigation button:hover {
+            background: linear-gradient(to right, #ff6b47, #feb47b);
+        }
+    </style>
+</head>
+<body>
+    <h1>Flower Task Results</h1>
+    <input type="text" id="filterInput" class="filter-input" placeholder="Filter tasks..." onkeyup="filterTable()">
+    <table id="taskTable">
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th onclick="sortTable(0)">UUID<div class="resize-handle"></div></th>
+                <th onclick="sortTable(1)">Name<div class="resize-handle"></div></th>
+                <th onclick="sortTable(2)">State<div class="resize-handle"></div></th>
+                <th onclick="sortTable(3)">Args<div class="resize-handle"></div></th>
+                <th onclick="sortTable(4)">Kwargs<div class="resize-handle"></div></th>
+                <th onclick="sortTable(5)">Worker<div class="resize-handle"></div></th>
+                <th onclick="sortTable(6)">Result<div class="resize-handle"></div></th>
+                <th onclick="sortTable(7)">Exception<div class="resize-handle"></div></th>
+                <th onclick="sortTable(8)">Traceback<div class="resize-handle"></div></th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Task rows will be inserted here by JavaScript -->
+        </tbody>
+    </table>
+    <div class="pagination" id="pagination">
+        <!-- Pagination buttons will be inserted here by JavaScript -->
+    </div>
+    <div id="popup" class="popup">
+        <div class="popup-content">
+            <span class="close" onclick="closePopup()">&times;</span>
+            <div id="popupContent"></div>
+            <div class="popup-navigation">
+                <button onclick="previousTask()">Previous</button>
+                <button onclick="nextTask()">Next</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        let flowerData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        let currentTaskIndex = 0;
+        const itemsPerPage = 2000;
+
+        async function fetchFlowerData() {
+            try {
+                const response = await fetch('flower_result.json'); // Fetch the JSON file
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch data from JSON file: ${response.statusText}`);
+                }
+                flowerData = await response.json();
+                filteredData = flowerData.data;
+                renderTable(filteredData); // Directly use the data array from the JSON
+                updatePagination();
+                addColumnResizers();
+            } catch (error) {
+                console.error('An error occurred:', error);
+            }
+        }
+
+        function renderTable(tasks) {
+            const tbody = document.querySelector('#taskTable tbody');
+            tbody.innerHTML = ''; // Clear existing rows
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const paginatedTasks = tasks.slice(start, end);
+            paginatedTasks.forEach((task, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${start + index + 1}</td>
+                    <td>${task.uuid}</td>
+                    <td>${task.name}</td>
+                    <td>${task.state}</td>
+                    <td>${task.args}</td>
+                    <td>${task.kwargs}</td>
+                    <td>${task.worker}</td>
+                    <td>${task.result}</td>
+                    <td>${task.exception}</td>
+                    <td>${task.traceback}</td>
+                `;
+                row.addEventListener('click', () => openPopup(task, start + index + 1));
+                tbody.appendChild(row);
+            });
+        }
+
+        function filterTable() {
+            const input = document.getElementById('filterInput');
+            const filter = input.value.toLowerCase();
+            filteredData = flowerData.data.filter(task => {
+                return Object.values(task).some(value =>
+                    String(value).toLowerCase().includes(filter)
+                );
+            });
+            currentPage = 1; // Reset to the first page after filtering
+            renderTable(filteredData);
+            updatePagination();
+        }
+
+        function sortTable(columnIndex) {
+            const isAsc = document.querySelector(`#taskTable th:nth-child(${columnIndex + 2})`).getAttribute('data-order') === 'asc';
+            const order = isAsc ? 'desc' : 'asc';
+            document.querySelector(`#taskTable th:nth-child(${columnIndex + 2})`).setAttribute('data-order', order);
+            filteredData.sort((a, b) => {
+                const valueA = Object.values(a)[columnIndex];
+                const valueB = Object.values(b)[columnIndex];
+                if (valueA < valueB) return isAsc ? -1 : 1;
+                if (valueA > valueB) return isAsc ? 1 : -1;
+                return 0;
+            });
+            renderTable(filteredData);
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable(filteredData);
+                updatePagination();
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < Math.ceil(filteredData.length / itemsPerPage)) {
+                currentPage++;
+                renderTable(filteredData);
+                updatePagination();
+            }
+        }
+
+        function goToPage(page) {
+            if (page >= 1 && page <= Math.ceil(filteredData.length / itemsPerPage)) {
+                currentPage = page;
+                renderTable(filteredData);
+                updatePagination();
+            }
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            const paginationContainer = document.getElementById('pagination');
+            paginationContainer.innerHTML = ''; // Clear existing pagination buttons
+
+            // Previous button
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Previous';
+            prevButton.onclick = previousPage;
+            prevButton.disabled = currentPage === 1;
+            paginationContainer.appendChild(prevButton);
+
+            // Page buttons
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.onclick = () => goToPage(i);
+                pageButton.disabled = i === currentPage;
+                paginationContainer.appendChild(pageButton);
+            }
+
+            // Next button
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Next';
+            nextButton.onclick = nextPage;
+            nextButton.disabled = currentPage === totalPages;
+            paginationContainer.appendChild(nextButton);
+        }
+
+        function addColumnResizers() {
+            const table = document.querySelector('#taskTable');
+            const cols = table.querySelectorAll('th');
+            [].forEach.call(cols, col => {
+                const resizer = document.createElement('div');
+                resizer.classList.add('resize-handle');
+                col.appendChild(resizer);
+                createResizableColumn(col, resizer);
+            });
+        }
+
+        function createResizableColumn(col, resizer) {
+            resizer.addEventListener('mousedown', function (e) {
+                const startX = e.clientX;
+                const rect = col.getBoundingClientRect();
+                const startWidth = rect.width;
+
+                function onMouseMove(e) {
+                    const width = startWidth - (startX - e.clientX);
+                    col.style.width = `${width}px`;
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function openPopup(task, index) {
+            currentTaskIndex = filteredData.indexOf(task);
+            const popup = document.getElementById('popup');
+            const popupContent = document.getElementById('popupContent');
+            popupContent.innerHTML = `
+                <p><strong>Index:</strong> ${index}</p>
+                <p><strong>UUID:</strong> ${task.uuid}</p>
+                <p><strong>Name:</strong> ${task.name}</p>
+                <p><strong>State:</strong> ${task.state}</p>
+                <p><strong>Args:</strong> ${task.args}</p>
+                <p><strong>Kwargs:</strong> ${task.kwargs}</p>
+                <p><strong>Worker:</strong> ${task.worker}</p>
+                <p><strong>Result:</strong> ${task.result}</p>
+                <p><strong>Exception:</strong> ${task.exception}</p>
+                <p><strong>Traceback:</strong> ${task.traceback}</p>
+            `;
+            popup.style.display = 'block';
+        }
+
+        function closePopup() {
+            const popup = document.getElementById('popup');
+            popup.style.display = 'none';
+        }
+
+        function previousTask() {
+            if (currentTaskIndex > 0) {
+                currentTaskIndex--;
+                openPopup(filteredData[currentTaskIndex], currentTaskIndex + 1);
+            }
+        }
+
+        function nextTask() {
+            if (currentTaskIndex < filteredData.length - 1) {
+                currentTaskIndex++;
+                openPopup(filteredData[currentTaskIndex], currentTaskIndex + 1);
+            }
+        }
+
+        // Fetch data when the page loads
+        window.onload = fetchFlowerData;
+    </script>
+</body>
+</html>
